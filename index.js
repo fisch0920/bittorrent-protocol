@@ -1,7 +1,7 @@
 module.exports = Wire
 
 var BitField = require('bitfield')
-var bncode = require('bncode')
+var bencode = require('bencode')
 var extend = require('extend.js')
 var inherits = require('inherits')
 var speedometer = require('speedometer')
@@ -123,7 +123,8 @@ Wire.prototype.end = function () {
 //
 
 Wire.prototype.use = function (Extension) {
-  if (!Extension.name) {
+  var name = Extension.name || Extension.prototype.name
+  if (!name) {
     throw new Error('Extension API requires a named function, e.g. function name() {}')
   }
 
@@ -142,9 +143,9 @@ Wire.prototype.use = function (Extension) {
     handler.onMessage = noop
   }
 
-  this.extendedMapping[ext] = Extension.name
-  this._ext[Extension.name] = handler
-  this[Extension.name] = handler
+  this.extendedMapping[ext] = name
+  this._ext[name] = handler
+  this[name] = handler
 
   this._nextExt += 1
 }
@@ -303,7 +304,7 @@ Wire.prototype.extended = function (ext, obj) {
   }
   if (typeof ext === 'number') {
     var ext_id = new Buffer([ext])
-    var buf = Buffer.isBuffer(obj) ? obj : bncode.encode(obj)
+    var buf = Buffer.isBuffer(obj) ? obj : bencode.encode(obj)
 
     this._message(20, [], Buffer.concat([ext_id, buf]))
   } else {
@@ -344,7 +345,7 @@ Wire.prototype._onHandshake = function (infoHash, peerId, extensions) {
     }
 
     // Send extended handshake
-    this.extended(0, bncode.encode(msg))
+    this.extended(0, bencode.encode(msg))
   }
 }
 
@@ -388,8 +389,8 @@ Wire.prototype._onRequest = function (index, offset, length) {
   if (this.amChoking) return
 
   var respond = function (err, buffer) {
-    if (err || request !== pull(this.peerRequests, index, offset, length))
-      return
+    if (request !== pull(this.peerRequests, index, offset, length)) return
+    if (err) return
     this.piece(index, offset, buffer)
   }.bind(this)
 
@@ -633,7 +634,7 @@ function pull (requests, piece, offset, length) {
 
 function safeBdecode (buf) {
   try {
-    return bncode.decode(buf);
+    return bencode.decode(buf);
   } catch (e) {
     console.warn(e);
   }
